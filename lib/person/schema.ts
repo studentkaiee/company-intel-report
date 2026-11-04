@@ -106,11 +106,22 @@ export type MatchConfidence = (typeof MATCH_LEVELS)[number];
 
 const key = <T extends Record<string, string>>(o: T) => z.enum(Object.keys(o) as [keyof T & string, ...(keyof T & string)[]]);
 
+/**
+ * Text the model writes, cut to `max` characters instead of failing validation: a long summary is not a reason to
+ * throw away a whole paid run (seen with Hyflux, whose court history is long).
+ */
+const capped = (max: number, min = 1) =>
+  z
+    .string()
+    .min(min)
+    .max(max * 20)
+    .transform((v) => (v.length <= max ? v : `${v.slice(0, max - 1).replace(/s+S*$/, "")}…`));
+
 export const ModelFindingSchema = z.object({
   category: key(CATEGORIES),
   case_stage: key(CASE_STAGES).catch("unknown"),
-  title: z.string().min(1).max(300),
-  source_name: z.string().min(1).max(200),
+  title: capped(300),
+  source_name: capped(200),
   source_url: z.string().url().max(2000),
   additional_source_urls: z.array(z.string().max(2000)).max(10).default([]),
   date: z
@@ -118,16 +129,16 @@ export const ModelFindingSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .catch(null),
-  summary: z.string().min(1).max(800),
+  summary: capped(800),
   match_confidence: z.enum(MATCH_LEVELS),
-  match_evidence: z.string().max(800),
+  match_evidence: capped(800, 0),
   historical: z.boolean().default(false),
 });
 
 export const ModelScreenSchema = z.object({
-  searches_run: z.array(z.string().max(300)).max(60).default([]),
+  searches_run: z.array(capped(300, 0)).max(100).transform((a) => a.slice(0, 60)).default([]),
   findings: z.array(ModelFindingSchema).max(40),
-  overall_note: z.string().max(1500).default(""),
+  overall_note: capped(1500, 0).default(""),
 });
 export type ModelScreen = z.output<typeof ModelScreenSchema>;
 

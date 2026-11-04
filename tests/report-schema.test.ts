@@ -99,3 +99,14 @@ describe("model JSON extraction", () => {
     expect(parseJson(ModelReportSchema, "I could not find anything.").ok).toBe(false);
   });
 });
+
+describe("section notes", () => {
+  it("trims an overlong note at a word boundary instead of failing", async () => {
+    const { SectionSchema, NOTE_MAX } = await import("@/lib/report-schema");
+    const long = "word ".repeat(200);
+    const s = SectionSchema.parse({ items: [], confidence: "low", note: long });
+    expect(s.note!.length).toBeLessThanOrEqual(NOTE_MAX);
+    expect(s.note!.endsWith("…")).toBe(true);
+    expect(SectionSchema.parse({ items: [], confidence: "low", note: "short" }).note).toBe("short");
+  });
+});

@@ -24,10 +24,26 @@ through the browser (scan tickets, preview tokens, report signatures). Generate 
 | Search | `POST /api/resolve` | Turnstile verified server-side. ACRA lookup (field-scoped name query). Returns candidates, each with a signed 30-min **scan ticket**. |
 | Quick scan | `POST /api/scan` | Needs a scan ticket. Haiku 5.5, max 5 web searches. Streams NDJSON progress. Returns a `Preview` plus a signed **preview token**. |
 | Pay | `POST /api/checkout` | Needs a preview token (so metadata can't be forged). Embedded Checkout, SGD, price from `REPORT_PRICE_SGD_CENTS`. |
-| Report | `POST /api/report` | Retrieves the session from Stripe, requires `paid`, increments `report_runs` on the PaymentIntent (max 3), runs Sonnet 5.5 deep research, streams progress. Returns the report JSON and an HMAC binding it to the session. On success, emails the PDF to the Checkout email via Resend (if configured). If the 3rd run fails and none ever succeeded, refunds the payment in full. |
+| Report | `POST /api/report` | Retrieves the session from Stripe, requires `paid`, increments `report_runs` on the PaymentIntent (max 3), runs Sonnet 5.5 deep research **and, in parallel, a litigation check** (see below), streams progress. Returns the report JSON and an HMAC binding it to the session. On success, emails the PDF to the Checkout email via Resend (if configured). If the 3rd run fails and none ever succeeded, refunds the payment in full. |
 | PDF | `POST /api/pdf` | Verifies the HMAC and that the session is paid, then renders with `@react-pdf/renderer`. Does not use a run. |
 
 The finished report is cached in the buyer's `localStorage` (keyed by Checkout Session), so a refresh doesn't re-run research.
+
+### Litigation and court records (company report)
+
+The company report's main check: is the company involved in litigation, or does it have a court history in
+Singapore? `lib/company-litigation.ts` uses the Individual Legal Screen's logic:
+
+- Two Claude calls in parallel: **Singapore court and regulator sites** (`allowed_domains` = `SG_OFFICIAL_SOURCES`,
+  high effort) and **other public legal sources** (open web, Singapore news media blocked).
+- Required searches: the registered name, the name without "Pte. Ltd.", "Public Prosecutor", judgment / appeal /
+  winding up, enforcement terms, judicial management / liquidation / striking off, and the UEN.
+- Findings must link to URLs from that call's own results; anything on judiciary.gov.sg or eLitigation is a strong
+  match. Only cases where the company itself is a party are reported.
+- Sanctions: the company name is screened against the UN and OFAC **entity** lists (`data/sanctions/*-entities.json`).
+  Every word of the company's name must appear in a listed name, so generic words alone don't match.
+- Shown near the top of the report page and PDF, before the business sections, as `report.litigation`. Reports saved
+  in browsers before this was added still open (the field is optional).
 
 ## Trust boundaries
 

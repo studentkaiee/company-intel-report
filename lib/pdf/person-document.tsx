@@ -79,7 +79,7 @@ export function sgtStamp(iso: string): string {
 
 const NO_MATCH = "No match found.";
 
-function sanctionsText(l: SanctionsListResult | undefined) {
+export function sanctionsText(l: SanctionsListResult | undefined) {
   if (!l) return { text: "Not checked.", hit: false };
   if (!l.checked) return { text: "Not checked: this list is not loaded.", hit: false };
   if (!l.matches.length) return { text: `${NO_MATCH} List as of ${l.asOf}.`, hit: false };
@@ -87,7 +87,7 @@ function sanctionsText(l: SanctionsListResult | undefined) {
   return { text: `${l.matches.length} possible match${l.matches.length === 1 ? "" : "es"}: ${names}. List as of ${l.asOf}.`, hit: true };
 }
 
-function findingsText(items: Finding[]) {
+export function findingsText(items: Finding[]) {
   if (!items.length) return { text: NO_MATCH, hit: false };
   const strong = items.filter((f) => f.matchConfidence === "strong").length;
   const titles = items.map((f, i) => `(${i + 1}) ${pdfText(f.title).replace(/\.$/, "")}.`).join(" ");
@@ -97,7 +97,7 @@ function findingsText(items: Finding[]) {
   };
 }
 
-function Row({ label, value, hit }: { label: string; value: string; hit?: boolean }) {
+export function Row({ label, value, hit }: { label: string; value: string; hit?: boolean }) {
   return (
     <View style={s.row} wrap={false}>
       <Text style={s.labelCell}>{label}</Text>
@@ -106,7 +106,7 @@ function Row({ label, value, hit }: { label: string; value: string; hit?: boolea
   );
 }
 
-function FindingBox({ f, n }: { f: Finding; n: number }) {
+export function FindingBox({ f, n, historicalNote = HISTORICAL_NOTE }: { f: Finding; n: number; historicalNote?: string }) {
   const finalOutcome = f.caseStage === "acquitted" || f.caseStage === "withdrawn";
   const rows: [string, string][] = [
     ["Category", CATEGORIES[f.category]],
@@ -117,7 +117,7 @@ function FindingBox({ f, n }: { f: Finding; n: number }) {
     ["Summary", pdfText(f.summary, "")],
     ["Match evidence", pdfText(f.matchEvidence, "")],
   ];
-  if (f.historical) rows.push(["Note", HISTORICAL_NOTE]);
+  if (f.historical) rows.push(["Note", historicalNote]);
   return (
     <View style={s.finding} wrap={false}>
       <Text style={s.findingTitle}>
@@ -155,19 +155,24 @@ function Footer({ stamp }: { stamp: string }) {
   );
 }
 
+/** Splits findings into the result-table rows: Singapore court records, regulators, MAS alerts, everything else. */
+export function groupFindings(findings: Finding[]) {
+  const isCourt = (f: Finding) => [f.sourceUrl, ...f.additionalSourceUrls].some((u) => onDomain(u, SG_COURT_RECORD_SOURCES));
+  const isSgOfficial = (f: Finding) => [f.sourceUrl, ...f.additionalSourceUrls].some((u) => onDomain(u, SG_OFFICIAL_SOURCES));
+  const court = findings.filter(isCourt);
+  const alerts = findings.filter((f) => !isCourt(f) && f.category === "investor_alert");
+  const regulatory = findings.filter((f) => !isCourt(f) && f.category !== "investor_alert" && isSgOfficial(f));
+  const other = findings.filter((f) => !isSgOfficial(f));
+  return { court, regulatory, alerts, other, ordered: [...court, ...regulatory, ...alerts, ...other] };
+}
+
 export function PersonDocument({ report }: { report: PersonReport }) {
   const subj = report.subject;
   const counts = findingCounts(report);
   const stamp = sgtStamp(report.generatedAt);
   const listByName = (code: string) => report.sanctions.lists.find((l) => l.list === code);
 
-  const isCourt = (f: Finding) => [f.sourceUrl, ...f.additionalSourceUrls].some((u) => onDomain(u, SG_COURT_RECORD_SOURCES));
-  const isSgOfficial = (f: Finding) => [f.sourceUrl, ...f.additionalSourceUrls].some((u) => onDomain(u, SG_OFFICIAL_SOURCES));
-  const court = report.findings.filter(isCourt);
-  const alerts = report.findings.filter((f) => !isCourt(f) && f.category === "investor_alert");
-  const regulatory = report.findings.filter((f) => !isCourt(f) && f.category !== "investor_alert" && isSgOfficial(f));
-  const other = report.findings.filter((f) => !isSgOfficial(f));
-  const ordered = [...court, ...regulatory, ...alerts, ...other];
+  const { court, regulatory, alerts, other, ordered } = groupFindings(report.findings);
 
   const un = sanctionsText(listByName("UN"));
   const ofac = sanctionsText(listByName("OFAC"));

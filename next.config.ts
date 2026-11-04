@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
   poweredByHeader: false,
   // Static sanctions lists read at runtime by the person screen (bundled data, not storage).
-  outputFileTracingIncludes: { "/api/person-report": ["./data/sanctions/*.json"] },
+  outputFileTracingIncludes: { "/api/person-report": ["./data/sanctions/*.json"], "/api/report": ["./data/sanctions/*.json"] },
   async headers() {
     const privatePage = [{ key: "X-Robots-Tag", value: "noindex" }, { key: "Cache-Control", value: "no-store" }];
     return [

@@ -61,6 +61,16 @@ describe("rankCandidates", () => {
     );
     expect(rankCandidates("acme", facts).map((f) => f.uen)).toEqual(["2", "3", "1"]);
   });
+
+  it("treats a registered name that differs only by its legal suffix as exact (Hyflux Ltd vs its subsidiaries)", () => {
+    const facts = parseAcraResponse(
+      body([
+        ...Array.from({ length: 12 }, (_, i) => record({ uen: `S${i}`, entity_name: `HYFLUX UTILITY ${i} PTE. LTD.` })),
+        record({ uen: "PARENT", entity_name: "HYFLUX LTD" }),
+      ]),
+    );
+    expect(rankCandidates(cleanNameQuery("Hyflux Ltd"), facts)[0]!.uen).toBe("PARENT");
+  });
 });
 
 describe("network calls", () => {

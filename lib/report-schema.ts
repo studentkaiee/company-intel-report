@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FindingSchema, SanctionsResultSchema } from "./person/schema";
 
 export const NO_INFO_NOTE = "No public information found";
 
@@ -42,11 +43,21 @@ export type Item = z.infer<typeof ItemSchema>;
 
 export const ConfidenceSchema = z.enum(["high", "medium", "low"]);
 
+export const NOTE_MAX = 300;
+
+/** Cuts a note to NOTE_MAX characters at a word boundary. */
+export function trimNote(note: string): string {
+  if (note.length <= NOTE_MAX) return note;
+  const cut = note.slice(0, NOTE_MAX - 1);
+  return `${cut.slice(0, cut.lastIndexOf(" ") > 200 ? cut.lastIndexOf(" ") : cut.length).trimEnd()}…`;
+}
+
 export const SectionSchema = z
   .object({
     items: z.array(ItemSchema).max(25),
     confidence: ConfidenceSchema,
-    note: z.string().max(300).optional(),
+    // Models sometimes write a long note (seen with Hyflux): trim it rather than fail the whole run.
+    note: z.string().max(5000).transform(trimNote).optional(),
   })
   .transform((s) => (s.items.length === 0 ? { ...s, note: s.note || NO_INFO_NOTE } : s));
 export type Section = z.infer<typeof SectionSchema>;
@@ -92,6 +103,20 @@ export const RegistryFactsSchema = z.object({
 });
 export type RegistryFacts = z.infer<typeof RegistryFactsSchema>;
 
+/**
+ * Litigation, court history and sanctions, found with the Individual Legal Screen's logic
+ * (lib/company-litigation.ts). Kept apart from the sections because its findings carry their own links.
+ */
+export const LitigationSchema = z.object({
+  sanctions: SanctionsResultSchema,
+  findings: z.array(FindingSchema),
+  unlikelyMatches: z.array(FindingSchema),
+  unlikelyOmitted: z.number(),
+  searchesRun: z.array(z.string()),
+  overallNote: z.string(),
+});
+export type Litigation = z.infer<typeof LitigationSchema>;
+
 export const ReportSchema = z.object({
   companyName: z.string(),
   uen: z.string().nullable(),
@@ -100,6 +125,8 @@ export const ReportSchema = z.object({
   registry: RegistryFactsSchema.nullable(),
   sections: z.object(sectionsShape),
   sources: z.array(SourceSchema),
+  // Optional so reports saved in browsers before this was added still load.
+  litigation: LitigationSchema.optional(),
 });
 export type Report = z.infer<typeof ReportSchema>;
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { lookupUen } from "@/lib/acra";
+import { companyLitigation } from "@/lib/company-litigation";
 import { UsageTracker } from "@/lib/cost";
 import { maskEmail, sendReportEmail } from "@/lib/email";
 import { jsonError, parseBody } from "@/lib/http";
@@ -44,11 +45,10 @@ export async function POST(req: Request) {
       const registry = meta.uen ? await lookupUen(meta.uen).catch(() => null) : null;
 
       emit({ type: "status", message: "Researching (this usually takes 2-4 minutes)…" });
-      report = await deepResearch(
-        { companyName: meta.company_name, uen: meta.uen || null, website: meta.website || null, registry },
-        emit,
-        usage,
-      );
+      const target = { companyName: meta.company_name, uen: meta.uen || null, website: meta.website || null, registry };
+      // Business research and the litigation check run side by side; if either fails, the run fails.
+      const [business, litigation] = await Promise.all([deepResearch(target, emit, usage), companyLitigation(target, emit, usage)]);
+      report = { ...business, litigation };
     } catch (err) {
       await saveUsage("error");
       // publicErrorMessage logs the error class; its generic text is replaced with a clearer one here.

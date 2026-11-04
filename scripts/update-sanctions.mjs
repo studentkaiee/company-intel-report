@@ -1,5 +1,6 @@
-// Downloads the official UN Security Council Consolidated List and the OFAC SDN list, keeps individuals only
-// (names, aliases, dates of birth, nationalities), and writes them to data/sanctions/*.json.
+// Downloads the official UN Security Council Consolidated List and the OFAC SDN list and writes trimmed copies to
+// data/sanctions/: individuals (names, aliases, dates of birth, nationalities) to un.json / ofac.json, and
+// entities (names, aliases, address countries) to un-entities.json / ofac-entities.json.
 // This is static data shipped with the app, not a database: re-run it and redeploy to refresh the lists.
 //
 //   node scripts/update-sanctions.mjs
@@ -64,7 +65,16 @@ function parseUn(xml) {
       program: text(p.UN_LIST_TYPE),
     };
   });
-  return { asOf, entries };
+  const entities = arr(root.ENTITIES?.ENTITY).map((e) => ({
+    id: `UN-${text(e.REFERENCE_NUMBER) || text(e.DATAID)}`,
+    names: uniq([text(e.FIRST_NAME), ...arr(e.ENTITY_ALIAS).map((a) => text(a.ALIAS_NAME))]),
+    birthYears: [],
+    birthDates: [],
+    // For entities this holds the countries of listed addresses.
+    nationalities: uniq(arr(e.ENTITY_ADDRESS).map((a) => text(a.COUNTRY))),
+    program: text(e.UN_LIST_TYPE),
+  }));
+  return { asOf, entries, entities };
 }
 
 function parseOfac(xml) {
@@ -87,20 +97,36 @@ function parseOfac(xml) {
         program: arr(e.programList?.program).map(text).join(", "),
       };
     });
-  return { asOf, entries };
+  const entities = arr(root.sdnEntry)
+    .filter((e) => text(e.sdnType) === "Entity")
+    .map((e) => ({
+      id: `OFAC-${text(e.uid)}`,
+      names: uniq([text(e.lastName), ...arr(e.akaList?.aka).map((a) => [text(a.firstName), text(a.lastName)].filter(Boolean).join(" "))]),
+      birthYears: [],
+      birthDates: [],
+      // For entities this holds the countries of listed addresses.
+      nationalities: uniq(arr(e.addressList?.address).map((a) => text(a.country))),
+      program: arr(e.programList?.program).map(text).join(", "),
+    }));
+  return { asOf, entries, entities };
 }
 
 async function main() {
   await mkdir(OUT, { recursive: true });
   const [un, ofac] = await Promise.all([download(UN_URL).then(parseUn), download(OFAC_URL).then(parseOfac)]);
+  const unMeta = { list: "UN", name: "UN Security Council Consolidated List", source: UN_URL, asOf: un.asOf };
+  const ofacMeta = { list: "OFAC", name: "US OFAC Specially Designated Nationals (SDN) List", source: OFAC_URL, asOf: ofac.asOf };
   const files = [
-    ["un.json", { list: "UN", name: "UN Security Council Consolidated List", source: UN_URL, ...un }],
-    ["ofac.json", { list: "OFAC", name: "US OFAC Specially Designated Nationals (SDN) List", source: OFAC_URL, ...ofac }],
+    ["un.json", { ...unMeta, entries: un.entries }, "individuals"],
+    ["ofac.json", { ...ofacMeta, entries: ofac.entries }, "individuals"],
+    // Companies and organisations, used to screen the company in a company report.
+    ["un-entities.json", { ...unMeta, entries: un.entities }, "entities"],
+    ["ofac-entities.json", { ...ofacMeta, entries: ofac.entities }, "entities"],
   ];
-  for (const [file, data] of files) {
-    if (data.entries.length < 100) throw new Error(`${file}: only ${data.entries.length} individuals parsed; refusing to overwrite`);
+  for (const [file, data, kind] of files) {
+    if (data.entries.length < 100) throw new Error(`${file}: only ${data.entries.length} ${kind} parsed; refusing to overwrite`);
     await writeFile(new URL(file, OUT), JSON.stringify(data));
-    console.log(`${file}: ${data.entries.length} individuals, as of ${data.asOf}`);
+    console.log(`${file}: ${data.entries.length} ${kind}, as of ${data.asOf}`);
   }
 }
 

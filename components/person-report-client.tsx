@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FindingCard } from "./finding-card";
 import { ProgressLog, logLineFor, type LogLine } from "./progress-log";
 import { readNdjson } from "@/lib/ndjson";
 import { loadInputs, loadReport, saveReport } from "@/lib/person/browser-storage";
-import { HISTORICAL_NOTE, PERSON_LIMITATIONS } from "@/lib/person/legal";
-import { CASE_STAGES, CATEGORIES, findingCounts, type Category, type Finding, type PersonReportPayload } from "@/lib/person/schema";
+import { PERSON_LIMITATIONS } from "@/lib/person/legal";
+import { CATEGORIES, findingCounts, type Category, type PersonReportPayload } from "@/lib/person/schema";
 
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
@@ -256,35 +257,6 @@ function Stat({ value, label }: { value: number | string; label: string }) {
     <div>
       <div className="text-xl font-semibold">{value}</div>
       <div className="text-xs text-muted">{label}</div>
-    </div>
-  );
-}
-
-function FindingCard({ f }: { f: Finding }) {
-  const finalOutcome = f.caseStage === "acquitted" || f.caseStage === "withdrawn";
-  return (
-    <div className="rounded-md border border-line bg-white p-4 text-sm">
-      <div className="font-medium">{f.title}</div>
-      <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted">
-        <span>{f.date ?? "Date unknown"}</span>
-        <span>· {f.sourceName}</span>
-        <span className={finalOutcome ? "rounded bg-green-100 px-1.5 font-semibold text-green-800" : "rounded bg-zinc-100 px-1.5 font-medium"}>
-          {CASE_STAGES[f.caseStage]}
-        </span>
-        <span className="rounded bg-accent-soft px-1.5">Match: {f.matchConfidence}</span>
-      </div>
-      <p className="mt-2">{f.summary}</p>
-      <p className="mt-1 text-xs text-muted">Match evidence: {f.matchEvidence}</p>
-      {f.historical ? <p className="mt-1 text-xs italic text-muted">{HISTORICAL_NOTE}</p> : null}
-      <ul className="mt-2 space-y-0.5 text-xs">
-        {[f.sourceUrl, ...f.additionalSourceUrls].map((u) => (
-          <li key={u}>
-            <a href={u} target="_blank" rel="noopener noreferrer nofollow" className="break-all text-accent hover:underline">
-              {u}
-            </a>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

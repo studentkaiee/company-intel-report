@@ -40,6 +40,19 @@ describe("ModelScreenSchema", () => {
     expect(bad({ source_url: "not a url" })).toBe(false);
   });
 
+  it("shortens overlong model text instead of failing the run", () => {
+    const r = parseJson(
+      ModelScreenSchema,
+      JSON.stringify({ findings: [modelFinding({ summary: "word ".repeat(400) })], overall_note: "note ".repeat(600) }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.findings[0]!.summary.length).toBeLessThanOrEqual(800);
+      expect(r.data.overall_note.length).toBeLessThanOrEqual(1500);
+      expect(r.data.overall_note.endsWith("…")).toBe(true);
+    }
+  });
+
   it("falls back to unknown stage and null date rather than failing", () => {
     const r = parseJson(ModelScreenSchema, JSON.stringify({ findings: [modelFinding({ case_stage: "sentenced" as never, date: "Feb 2024" })] }));
     expect(r.ok && r.data.findings[0]).toMatchObject({ case_stage: "unknown", date: null });

@@ -168,6 +168,71 @@ export function screenList(subject: PersonInput, list: SanctionsList): Sanctions
   return { list: list.list, name: list.name, asOf: list.asOf, checked: list.entries.length > 0, matches: matches.slice(0, 10) };
 }
 
+// ---------- Companies (sanctioned entities) ----------
+
+const ENTITY_LIST_FILES = ["un-entities.json", "ofac-entities.json", "tsofa-entities.json"];
+let loadedEntities: SanctionsList[] | undefined;
+
+export function loadEntityLists(): SanctionsList[] {
+  loadedEntities ??= ENTITY_LIST_FILES.map(
+    (f) => JSON.parse(readFileSync(path.join(process.cwd(), "data", "sanctions", f), "utf8")) as SanctionsList,
+  );
+  return loadedEntities;
+}
+
+// Legal-form words say nothing about which company it is.
+const LEGAL_FORM = new Set([
+  "pte", "ltd", "limited", "private", "co", "company", "inc", "incorporated", "corp", "corporation", "llp", "llc", "lp",
+  "plc", "bhd", "berhad", "sdn", "gmbh", "ag", "sa", "nv", "bv", "pty", "the", "and",
+]);
+
+export const companyTokens = (name: string) => nameTokens(name.replace(/&/g, " and ")).filter((t) => !LEGAL_FORM.has(t));
+
+/**
+ * Every word of the company's name must appear in the listed name. Unlike people's names, company names share
+ * generic words ("Marine Services", "Trading"), so a shorter listed name must not match a longer company name.
+ */
+export const companyNameScore = (subject: string[], listed: string[]) => (subject.length > listed.length ? 0 : nameScore(subject, listed));
+
+/** Screens a company name (and any former names) against the sanctioned-entity lists. */
+export function screenCompanyList(names: string[], list: SanctionsList): SanctionsListResult {
+  const subjectNames = names.map(companyTokens).filter((t) => t.length);
+  const matches: SanctionsListResult["matches"] = [];
+  for (const entry of list.entries) {
+    let best = 0;
+    let bestName = "";
+    for (const listed of entry.names) {
+      const tokens = companyTokens(listed);
+      for (const s of subjectNames) {
+        const score = companyNameScore(s, tokens);
+        if (score > best) {
+          best = score;
+          bestName = listed;
+        }
+      }
+    }
+    if (best < MATCH_THRESHOLD) continue;
+    const reasons = [`name similarity ${Math.round(best * 100)}%`];
+    if (entry.nationalities.length) reasons.push(`listed address countries: ${entry.nationalities.join(", ")}`);
+    matches.push({
+      entryId: entry.id,
+      listedName: bestName,
+      score: Math.round(best * 100) / 100,
+      birthYears: [],
+      nationalities: entry.nationalities,
+      program: entry.program,
+      reason: reasons.join("; "),
+    });
+  }
+  matches.sort((x, y) => y.score - x.score);
+  return { list: list.list, name: list.name, asOf: list.asOf, checked: list.entries.length > 0, matches: matches.slice(0, 10) };
+}
+
+export function screenCompanySanctions(names: string[], lists: SanctionsList[] = loadEntityLists()): SanctionsResult {
+  const results = lists.map((l) => screenCompanyList(names, l));
+  return { status: results.some((r) => r.matches.length) ? "possible_match" : "no_match", lists: results };
+}
+
 export function screenSanctions(subject: PersonInput, lists: SanctionsList[] = loadSanctionsLists()): SanctionsResult {
   const results = lists.map((l) => screenList(subject, l));
   return { status: results.some((r) => r.matches.length) ? "possible_match" : "no_match", lists: results };

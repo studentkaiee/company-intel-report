@@ -1,0 +1,8 @@
+{
+  "list": "TSOFA",
+  "name": "Singapore Terrorism (Suppression of Financing) Act 2002, First Schedule (entities)",
+  "source": "https://sso.agc.gov.sg/Act/TSFA2002",
+  "asOf": "",
+  "note": "Maintained by hand. Copy the entities named in the First Schedule from Singapore Statutes Online and set asOf to the date you checked. While entries is empty this list is reported as not checked.",
+  "entries": []
+}

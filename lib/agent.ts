@@ -95,6 +95,7 @@ export async function runResearchAgent<S extends z.ZodType>(opts: AgentOptions<S
   }
   let result = parseJson(opts.schema, finalText(message));
   if (!result.ok) {
+    console.error("model output failed validation:", issuePaths(opts.schema, finalText(message)));
     opts.onEvent?.({ type: "status", message: "Tidying up the findings…" });
     messages.push({ role: "assistant", content: message.content });
     messages.push({
@@ -106,7 +107,10 @@ export async function runResearchAgent<S extends z.ZodType>(opts: AgentOptions<S
     message = await runTurn();
     result = parseJson(opts.schema, finalText(message));
   }
-  if (!result.ok) throw new PublicError("The research results could not be validated. Please try again.");
+  if (!result.ok) {
+    console.error("model output failed validation after repair:", issuePaths(opts.schema, finalText(message)));
+    throw new PublicError("The research results could not be validated. Please try again.");
+  }
   return { data: result.data, seenUrls };
 }
 
@@ -132,6 +136,23 @@ function finalText(message: Anthropic.Beta.BetaMessage): string {
     .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
     .map((b) => b.text)
     .join("");
+}
+
+/** Where validation failed, as field paths and issue codes only: never the model's text, which can hold report content. */
+function issuePaths(schema: z.ZodType, text: string): string {
+  let raw: unknown;
+  try {
+    raw = extractJson(text);
+  } catch {
+    return "no JSON object found";
+  }
+  const parsed = schema.safeParse(raw);
+  return parsed.success
+    ? "ok"
+    : parsed.error.issues
+        .slice(0, 10)
+        .map((i) => `${i.path.join(".") || "(root)"} [${i.code}]`)
+        .join("; ");
 }
 
 export function extractJson(text: string): unknown {

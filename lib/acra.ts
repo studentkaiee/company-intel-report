@@ -59,7 +59,9 @@ export function rankCandidates(query: string, facts: RegistryFacts[]): RegistryF
   const score = (f: RegistryFacts) => {
     const name = f.entityName.toUpperCase();
     let s = 0;
-    if (name === q) s += 100;
+    // The query arrives with "Ltd" etc. stripped, so compare it with the name stripped the same way too:
+    // otherwise "HYFLUX LTD" is not an exact match for "Hyflux Ltd" and sinks below its subsidiaries.
+    if (name === q || cleanNameQuery(f.entityName).toUpperCase() === q) s += 100;
     else if (name.startsWith(q)) s += 50;
     else if (name.includes(q)) s += 20;
     if (/^(live|registered)/i.test(f.status)) s += 10;

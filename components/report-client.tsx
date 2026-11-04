@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LitigationView } from "./litigation-view";
 import { ProgressLog, logLineFor, type LogLine } from "./progress-log";
 import { RegistryView, SectionView, SourceList } from "./section-view";
 import { DISCLAIMER } from "@/lib/legal";
@@ -184,6 +185,8 @@ export function ReportClient() {
         <h2 className="text-lg font-semibold">Registry facts</h2>
         <RegistryView registry={report.registry} />
       </section>
+
+      {report.litigation ? <LitigationView litigation={report.litigation} /> : null}
 
       {SECTION_KEYS.map((k) => (
         <SectionView key={k} title={SECTION_TITLES[k]} section={report.sections[k]} sources={report.sources} />
