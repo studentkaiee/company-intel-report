@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonError, parseBody } from "@/lib/http";
+import { jsonError, parseBody, publicOrigin } from "@/lib/http";
 import { PublicError } from "@/lib/ndjson";
 import { createPersonCheckoutSession } from "@/lib/person/gate";
 import { PersonInputSchema } from "@/lib/person/schema";
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     return jsonError(403, "The bot check failed. Please try again.");
   }
 
-  const origin = new URL(req.url).origin;
+  const origin = publicOrigin(req);
   try {
     const { clientSecret } = await createPersonCheckoutSession(
       body.inputs,

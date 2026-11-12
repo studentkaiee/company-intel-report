@@ -3,7 +3,7 @@ import { lookupUen } from "@/lib/acra";
 import { companyLitigation } from "@/lib/company-litigation";
 import { UsageTracker } from "@/lib/cost";
 import { maskEmail, sendReportEmail } from "@/lib/email";
-import { jsonError, parseBody } from "@/lib/http";
+import { jsonError, parseBody, publicOrigin } from "@/lib/http";
 import { PublicError, ndjsonResponse, publicErrorMessage } from "@/lib/ndjson";
 import { reportFilename } from "@/lib/pdf/filename";
 import { renderReportPdf } from "@/lib/pdf/render";
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   if (!allowance.ok) return jsonError(allowance.status, allowance.reason);
   const { meta, runs, paymentIntentId, email } = allowance;
   const runsLeft = MAX_REPORT_RUNS - runs;
-  const reportUrl = `${new URL(req.url).origin}/report?session_id=${encodeURIComponent(body.sessionId)}`;
+  const reportUrl = `${publicOrigin(req)}/report?session_id=${encodeURIComponent(body.sessionId)}`;
 
   return ndjsonResponse<ReportPayload>(async (emit) => {
     const usage = new UsageTracker();

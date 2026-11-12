@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonError, parseBody } from "@/lib/http";
+import { jsonError, parseBody, publicOrigin } from "@/lib/http";
 import { createCheckoutSession } from "@/lib/stripe";
 import { readPreviewToken } from "@/lib/tokens";
 
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const preview = readPreviewToken(body.previewToken);
   if (!preview) return jsonError(403, "This preview has expired. Please run the search again.");
 
-  const origin = new URL(req.url).origin;
+  const origin = publicOrigin(req);
   try {
     const { clientSecret } = await createCheckoutSession(
       { uen: preview.uen ?? "", company_name: preview.name, website: preview.website ?? "" },

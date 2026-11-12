@@ -9,6 +9,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
   poweredByHeader: false,
+  // Lets the dev server be shared through a temporary Cloudflare quick tunnel (`cloudflared tunnel --url`).
+  // Only affects `next dev`; production on Vercel ignores it.
+  allowedDevOrigins: ["*.trycloudflare.com"],
   // Static sanctions lists read at runtime by the person screen (bundled data, not storage).
   outputFileTracingIncludes: { "/api/person-report": ["./data/sanctions/*.json"], "/api/report": ["./data/sanctions/*.json"] },
   async headers() {
