@@ -37,6 +37,11 @@ export const SG_MEDIA_DOMAINS = [
   "mothership.sg",
   "asiaone.com",
   "sg.news.yahoo.com",
+  // Found in a Hyflux test run: Yahoo Finance Singapore carries Singapore news too.
+  "sg.finance.yahoo.com",
+  "sg.yahoo.com",
+  "theedgesingapore.com",
+  "edgeprop.sg",
   "8world.com",
   "theindependent.sg",
   "mustsharenews.com",
